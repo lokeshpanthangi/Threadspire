@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,6 +23,8 @@ interface FilterBarProps {
   setActiveSort: (sort: string) => void;
   selectedTags: string[];
   onTagToggle: (tag: string) => void;
+  searchQuery: string;
+  onSearchChange: (value: string) => void;
 }
 
 const FilterBar = ({
@@ -32,7 +33,9 @@ const FilterBar = ({
   activeSort,
   setActiveSort,
   selectedTags,
-  onTagToggle
+  onTagToggle,
+  searchQuery,
+  onSearchChange
 }: FilterBarProps) => {
   return (
     <div className="space-y-4">
@@ -43,6 +46,8 @@ const FilterBar = ({
           <Input 
             placeholder="Search threads..." 
             className="pl-10 w-full"
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
           />
         </div>
         

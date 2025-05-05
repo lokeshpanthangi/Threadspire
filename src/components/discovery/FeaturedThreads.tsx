@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, User } from 'lucide-react';
 import { analyticsService } from '@/lib/services/analytics.service';
 import { threadService } from '@/lib/services/thread.service';
+import { supabase } from '@/lib/supabase';
 
 interface ThreadData {
   id: string;
@@ -19,6 +20,7 @@ interface ThreadData {
 
 const FeaturedThreads = () => {
   const [featuredThreads, setFeaturedThreads] = useState<ThreadData[]>([]);
+  const [profileMap, setProfileMap] = useState<Record<string, { name: string; avatarUrl: string }>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,10 +30,9 @@ const FeaturedThreads = () => {
         setLoading(true);
         // Try to get trending threads first
         const trendingThreads = await analyticsService.getTrendingThreads(2);
-        
+        let threadsToShow = [];
         if (trendingThreads && trendingThreads.length >= 2) {
-          // If we have enough trending threads, use them
-          setFeaturedThreads(trendingThreads);
+          threadsToShow = trendingThreads;
         } else {
           // Otherwise, fall back to recent threads
           const { threads } = await threadService.getThreads({
@@ -40,9 +41,7 @@ const FeaturedThreads = () => {
             sortOrder: 'desc',
             onlyPublished: true
           });
-          
-          // Format threads to match the structure we need
-          setFeaturedThreads(threads.map((thread: any) => ({
+          threadsToShow = threads.map((thread: any) => ({
             id: thread.id,
             title: thread.title,
             cover_image: thread.cover_image || 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?auto=format&fit=crop&w=800&q=80',
@@ -50,13 +49,27 @@ const FeaturedThreads = () => {
             user_id: thread.user_id,
             snippet: thread.snippet || thread.segments?.[0]?.content.substring(0, 150),
             tags: thread.tags
-          })));
+          }));
+        }
+        setFeaturedThreads(threadsToShow);
+        // Fetch creator profiles
+        const userIds = Array.from(new Set(threadsToShow.map(t => t.user_id).filter(Boolean)));
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .in('id', userIds);
+          const map: Record<string, { name: string; avatarUrl: string }> = {};
+          profiles?.forEach((p: any) => {
+            map[p.id] = { name: p.name || 'Anonymous', avatarUrl: p.avatar_url || '/placeholder-avatar.jpg' };
+          });
+          setProfileMap(map);
+        } else {
+          setProfileMap({});
         }
       } catch (err) {
         console.error('Error loading featured threads:', err);
         setError('Failed to load featured threads');
-        
-        // Provide default image for error cases
         setFeaturedThreads([
           {
             id: '1',
@@ -68,11 +81,11 @@ const FeaturedThreads = () => {
             tags: ['Getting Started']
           }
         ]);
+        setProfileMap({});
       } finally {
         setLoading(false);
       }
     };
-    
     loadFeaturedThreads();
   }, []);
 
@@ -131,10 +144,10 @@ const FeaturedThreads = () => {
                 <div className="p-6 pt-0 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src="/placeholder-avatar.jpg" alt="Author" />
+                      <AvatarImage src={profileMap[thread.user_id]?.avatarUrl || "/placeholder-avatar.jpg"} alt={profileMap[thread.user_id]?.name || "Anonymous"} />
                       <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
                     </Avatar>
-                    <span className="text-sm">Author</span>
+                    <span className="text-sm">{profileMap[thread.user_id]?.name || 'Anonymous'}</span>
                   </div>
                   <span className="text-sm text-muted-foreground">
                     {formatDate(thread.created_at)}

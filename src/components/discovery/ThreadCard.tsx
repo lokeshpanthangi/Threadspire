@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -63,8 +62,8 @@ const ThreadCard = ({ thread }: ThreadCardProps) => {
           if (profile) {
             setAuthorInfo({
               ...thread.author,
-              name: profile.name || 'Anonymous User',
-              avatarUrl: profile.avatar_url || '/placeholder-avatar.jpg'
+              name: profile.name || thread.author.name,
+              avatarUrl: profile.avatar_url || thread.author.avatarUrl
             });
           }
         } catch (error) {
@@ -129,8 +128,7 @@ const ThreadCard = ({ thread }: ThreadCardProps) => {
               <span className="text-xs">{authorInfo.name}</span>
             </div>
             <span className="text-xs text-muted-foreground">
-              {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
-                .format(thread.publishedAt)}
+              {formatThreadDate(thread.publishedAt)}
             </span>
           </div>
           
@@ -163,12 +161,25 @@ const ThreadCard = ({ thread }: ThreadCardProps) => {
                 className={`h-4 w-4 ${isBookmarked ? 'fill-threadspire-gold text-threadspire-gold' : 'text-muted-foreground'}`} 
               />
             </button>
-            <span className="text-xs text-muted-foreground">{thread.readingTime} min</span>
           </div>
         </div>
       </CardContent>
     </Card>
   );
 };
+
+function formatThreadDate(date: Date) {
+  const now = new Date();
+  const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 3600 * 24));
+  if (diffInDays < 1) {
+    return 'Today';
+  } else if (diffInDays === 1) {
+    return 'Yesterday';
+  } else if (diffInDays < 7) {
+    return `${diffInDays} days ago`;
+  } else {
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+  }
+}
 
 export default ThreadCard;

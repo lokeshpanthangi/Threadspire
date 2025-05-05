@@ -19,6 +19,7 @@ import FeaturedThreads from '@/components/discovery/FeaturedThreads';
 import ThreadCard from '@/components/discovery/ThreadCard';
 import FilterBar from '@/components/discovery/FilterBar';
 import { threadService } from '@/lib/services/thread.service';
+import { supabase } from '@/lib/supabase';
 
 interface Thread {
   id: string;
@@ -32,6 +33,7 @@ interface Thread {
   tags: string[];
   snippet?: string;
   reaction_counts?: Record<string, number>;
+  user_id: string;
 }
 
 interface FormattedThread {
@@ -61,6 +63,8 @@ const Index = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const threadsPerPage = 6;
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [profileMap, setProfileMap] = useState<Record<string, { name: string; avatarUrl: string }>>({});
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Load threads from database instead of static data
   useEffect(() => {
@@ -84,8 +88,41 @@ const Index = () => {
             selectedTags.every(tag => thread.tags.includes(tag))
           );
         }
+        // Search filter
+        if (searchQuery.trim() !== '') {
+          const q = searchQuery.trim().toLowerCase();
+          filteredThreads = filteredThreads.filter(thread =>
+            thread.title.toLowerCase().includes(q) ||
+            (thread.snippet && thread.snippet.toLowerCase().includes(q))
+          );
+        }
+        // Client-side sorting for bookmarks and reactions
+        if (activeSort === 'bookmarks') {
+          filteredThreads = [...filteredThreads].sort((a, b) => (b.bookmarks || 0) - (a.bookmarks || 0));
+        } else if (activeSort === 'reactions') {
+          filteredThreads = [...filteredThreads].sort((a, b) => {
+            const aReactions = Object.values(a.reaction_counts || {}).reduce((x, y) => x + y, 0);
+            const bReactions = Object.values(b.reaction_counts || {}).reduce((x, y) => x + y, 0);
+            return bReactions - aReactions;
+          });
+        }
         setThreads(filteredThreads);
         setTotalThreads(filteredThreads.length);
+        // Fetch all unique user_ids for the current threads
+        const userIds = Array.from(new Set(filteredThreads.map(t => t.user_id)));
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .in('id', userIds);
+          const map: Record<string, { name: string; avatarUrl: string }> = {};
+          profiles?.forEach((p: any) => {
+            map[p.id] = { name: p.name || 'Anonymous', avatarUrl: p.avatar_url || '/placeholder-avatar.jpg' };
+          });
+          setProfileMap(map);
+        } else {
+          setProfileMap({});
+        }
       } catch (error) {
         console.error('Error loading threads:', error);
         setError('Failed to load threads. Please try again later.');
@@ -95,7 +132,7 @@ const Index = () => {
     };
     
     loadThreads();
-  }, [activeSort, currentPage, selectedTags]);
+  }, [activeSort, currentPage, selectedTags, searchQuery]);
   
   // Handler for tag filtering
   const handleTagToggle = (tag: string) => {
@@ -115,16 +152,13 @@ const Index = () => {
       (a: number, b: number) => a + b, 
       0
     );
-    
+    const author = profileMap[thread.user_id] || { name: 'Anonymous', avatarUrl: '/placeholder-avatar.jpg' };
     return {
       id: thread.id,
       title: thread.title,
       snippet: thread.snippet || (thread.segments?.[0]?.content.substring(0, 120) + '...') || "No content",
       coverImage: thread.cover_image,
-      author: {
-        name: "Author",
-        avatarUrl: "/placeholder-avatar.jpg",
-      },
+      author,
       publishedAt: new Date(thread.created_at),
       readingTime: thread.segments?.length || 1,
       bookmarks: 0,
@@ -158,6 +192,8 @@ const Index = () => {
             setActiveSort={setActiveSort}
             selectedTags={selectedTags}
             onTagToggle={handleTagToggle}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
           />
         </div>
         
@@ -203,10 +239,10 @@ const Index = () => {
                           <div className="flex justify-between mb-1">
                             <div className="flex items-center gap-2">
                               <Avatar className="h-5 w-5">
-                                <AvatarImage src="/placeholder-avatar.jpg" alt="Author" />
-                                <AvatarFallback>A</AvatarFallback>
+                                <AvatarImage src={profileMap[thread.user_id]?.avatarUrl || '/placeholder-avatar.jpg'} alt={profileMap[thread.user_id]?.name || 'Anonymous'} />
+                                <AvatarFallback>{(profileMap[thread.user_id]?.name || 'A')[0]}</AvatarFallback>
                               </Avatar>
-                              <span className="text-xs">Author</span>
+                              <span className="text-xs">{profileMap[thread.user_id]?.name || 'Anonymous'}</span>
                               <span className="text-xs text-muted-foreground">
                                 {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
                                   .format(new Date(thread.created_at))}

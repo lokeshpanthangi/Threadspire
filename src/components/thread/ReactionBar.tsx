@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ReactionType, reactionService } from '@/lib/services/reaction.service';
@@ -109,20 +108,24 @@ const ReactionBar = ({ threadId }: ReactionBarProps) => {
       });
       return;
     }
-    
+
     try {
       if (userReactions.includes(type)) {
-        // Remove reaction
+        // Remove reaction (toggle off)
         await reactionService.removeReaction(threadId, type);
-        setUserReactions(userReactions.filter(r => r !== type));
+        setUserReactions([]);
         setReactionCounts(prev => ({
           ...prev,
           [type]: Math.max(0, prev[type] - 1)
         }));
       } else {
-        // Add reaction
+        // Remove any existing reaction first (if any)
+        if (userReactions.length > 0) {
+          await reactionService.removeReaction(threadId, userReactions[0]);
+        }
+        // Add new reaction
         await reactionService.addReaction(threadId, type);
-        setUserReactions([...userReactions, type]);
+        setUserReactions([type]);
         setReactionCounts(prev => ({
           ...prev,
           [type]: prev[type] + 1

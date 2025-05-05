@@ -122,8 +122,11 @@ export const threadService = {
   async forkThread(originalThreadId: string) {
     // Get the original thread data
     const originalThread = await this.getThreadById(originalThreadId)
-    
     if (!originalThread) throw new Error('Thread not found')
+
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
 
     // Create a new thread with the original content
     const { data: newThread, error: threadError } = await supabase
@@ -133,7 +136,8 @@ export const threadService = {
         is_published: false, // Set as draft initially
         original_thread_id: originalThreadId,
         cover_image: originalThread.cover_image,
-        snippet: originalThread.segments[0]?.content.substring(0, 150)
+        snippet: originalThread.segments[0]?.content.substring(0, 150),
+        user_id: user.id // Set the new thread's owner
       })
       .select()
       .single()
@@ -148,7 +152,6 @@ export const threadService = {
         order_index: index,
       })
     )
-
     await Promise.all(segmentPromises)
 
     // Copy tags
@@ -160,14 +163,12 @@ export const threadService = {
           .upsert({ name: tagName }, { onConflict: 'name' })
           .select()
           .single()
-
         // Link it to the new thread
         await supabase.from('thread_tags').insert({
           thread_id: newThread.id,
           tag_id: tag.id,
         })
       })
-
       await Promise.all(tagPromises)
     }
 
@@ -215,14 +216,13 @@ export const threadService = {
     }
 
     // Get user data
-    const { data: userData, error: userError } = await supabase
-      .from('auth.users')
-      .select('raw_user_meta_data')
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('name, avatar_url')
       .eq('id', thread.user_id)
-      .single()
-
-    if (userError) {
-      console.error('User fetch error:', userError);
+      .single();
+    if (profileError) {
+      console.error('Profile fetch error:', profileError);
     }
 
     // Get reaction counts
@@ -270,8 +270,8 @@ export const threadService = {
       tags: thread.tags.map((t: any) => t.tag.name),
       reaction_counts,
       author: {
-        name: userData?.raw_user_meta_data?.name || 'Anonymous',
-        avatar: userData?.raw_user_meta_data?.avatar_url || null
+        name: profile?.name || 'Unknown Creator',
+        avatar: profile?.avatar_url || null
       }
     }
   },
@@ -426,17 +426,57 @@ export const threadService = {
 
     if (error) throw error;
 
+    // Fetch bookmarks count for all thread ids
+    const threadIds = data.map((thread: any) => thread.id);
+    let bookmarksMap: Record<string, number> = {};
+    if (threadIds.length > 0) {
+      const { data: bookmarksData } = await supabase
+        .from('bookmarks')
+        .select('thread_id')
+        .in('thread_id', threadIds);
+      if (bookmarksData) {
+        bookmarksData.forEach((row: any) => {
+          bookmarksMap[row.thread_id] = (bookmarksMap[row.thread_id] || 0) + 1;
+        });
+      }
+    }
+
+    // Fetch reactions for all thread ids and count them per thread/type
+    let reactionsMap: Record<string, Record<string, number>> = {};
+    if (threadIds.length > 0) {
+      const { data: reactionsData } = await supabase
+        .from('reactions')
+        .select('thread_id, type');
+      if (reactionsData) {
+        reactionsData.forEach((row: any) => {
+          if (!reactionsMap[row.thread_id]) {
+            reactionsMap[row.thread_id] = {
+              '🧠': 0,
+              '🔥': 0,
+              '👏': 0,
+              '👀': 0,
+              '⚠': 0,
+            };
+          }
+          if (row.type in reactionsMap[row.thread_id]) {
+            reactionsMap[row.thread_id][row.type] += 1;
+          }
+        });
+      }
+    }
+
     return {
       threads: data.map((thread: any) => ({
         ...thread,
         tags: thread.tags.map((t: any) => t.tag.name),
-        reaction_counts: {
+        reaction_counts: reactionsMap[thread.id] || {
           '🧠': 0,
           '🔥': 0,
           '👏': 0,
           '👀': 0,
           '⚠': 0,
         },
+        bookmarks: bookmarksMap[thread.id] || 0,
       })),
       total: count,
     };

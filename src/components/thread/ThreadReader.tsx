@@ -262,7 +262,7 @@ const ThreadReader = ({ threadId: propThreadId }: ThreadReaderProps) => {
   };
 
   // Get author name and bio
-  const authorName = thread?.author?.name || 'Anonymous';
+  const authorName = thread?.author?.name || 'Unknown Creator';
   const authorBio = thread?.author?.bio || 'No bio available';
   const authorAvatar = thread?.author?.avatar || '/placeholder-avatar.jpg';
 

@@ -1,4 +1,3 @@
-
 import { supabase } from '../supabase';
 
 export const analyticsService = {
@@ -80,7 +79,7 @@ export const analyticsService = {
         tags: thread.tags.map((t: any) => t.tag.name),
         author: {
           id: thread.user_id,
-          name: thread.user?.name || 'Anonymous User',
+          name: thread.user?.name || 'Unknown Creator',
           avatarUrl: thread.user?.avatar_url || '/placeholder-avatar.jpg'
         }
       }));

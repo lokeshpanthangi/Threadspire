@@ -1,4 +1,3 @@
-
 import { supabase } from '../supabase'
 
 export type ReactionType = '🧠' | '🔥' | '👏' | '👀' | '⚠'
@@ -106,7 +105,7 @@ export const reactionService = {
     return data.map(reaction => ({
       userId: reaction.user_id,
       type: reaction.type as ReactionType,
-      userName: reaction.profiles?.name || 'Anonymous User',
+      userName: reaction.profiles?.name || 'Unknown Creator',
       userAvatar: reaction.profiles?.avatar_url || null,
       createdAt: reaction.created_at
     }))
