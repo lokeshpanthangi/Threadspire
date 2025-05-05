@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -6,9 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User, Calendar, Edit } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import AuthoredThreadsTab from './AuthoredThreadsTab';
-import CollectionsTab from './CollectionsTab';
 import BookmarksTab from './BookmarksTab';
-import ActivityTab from './ActivityTab';
 
 interface UserProfileProps {
   username: string | undefined;
@@ -127,25 +124,15 @@ const UserProfile = ({ username }: UserProfileProps) => {
       <Tabs defaultValue="threads" className="mt-8">
         <TabsList className="w-full justify-start border-b rounded-none gap-8 px-4">
           <TabsTrigger value="threads" className="data-[state=active]:border-b-2 data-[state=active]:border-threadspire-gold rounded-none">Threads</TabsTrigger>
-          <TabsTrigger value="collections" className="data-[state=active]:border-b-2 data-[state=active]:border-threadspire-gold rounded-none">Collections</TabsTrigger>
           <TabsTrigger value="bookmarks" className="data-[state=active]:border-b-2 data-[state=active]:border-threadspire-gold rounded-none">Bookmarks</TabsTrigger>
-          <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-threadspire-gold rounded-none">Activity</TabsTrigger>
         </TabsList>
         
         <TabsContent value="threads" className="mt-6">
           <AuthoredThreadsTab userId={user.id} />
         </TabsContent>
         
-        <TabsContent value="collections" className="mt-6">
-          <CollectionsTab userId={user.id} />
-        </TabsContent>
-        
         <TabsContent value="bookmarks" className="mt-6">
           <BookmarksTab userId={user.id} isOwnProfile={isOwnProfile} />
-        </TabsContent>
-        
-        <TabsContent value="activity" className="mt-6">
-          <ActivityTab userId={user.id} />
         </TabsContent>
       </Tabs>
     </div>
