@@ -73,6 +73,7 @@ const ThreadCreator = () => {
   const queryParams = new URLSearchParams(location.search);
   const draftId = queryParams.get('draft');
   const forkId = queryParams.get('fork');
+  const remixFrom = queryParams.get('remixFrom');
   
   const [thread, setThread] = useState<ThreadData>({
     id: generateId(),
@@ -94,35 +95,67 @@ const ThreadCreator = () => {
   // Load draft or fork if specified
   useEffect(() => {
     const loadThread = async () => {
-      if (draftId) {
+      if (remixFrom) {
         try {
           setIsLoading(true);
-          // Load from drafts table
-          const draftData = await draftService.getDraftById(draftId);
+          // Load the original thread for pre-filling
+          const threadData = await threadService.getThreadById(remixFrom);
           setThread({
-            id: draftData.id,
-            title: draftData.title,
-            coverImage: null,
-            segments: Array.isArray(draftData.content)
-              ? draftData.content.map((seg: any) => ({
-                  id: generateId(),
-                  content: seg.content,
-                  type: seg.type || 'text'
-                }))
-              : [{ id: generateId(), content: '', type: 'text' }],
-            tags: [],
-            isPublic: true,
-            lastSaved: new Date(draftData.updated_at)
+            id: generateId(),
+            title: threadData.title,
+            coverImage: threadData.cover_image || null,
+            segments: threadData.segments.map((seg: any) => ({
+              id: generateId(),
+              content: seg.content,
+              type: 'text'
+            })),
+            tags: threadData.tags || [],
+            isPublic: threadData.is_published,
+            lastSaved: new Date()
           });
           toast({
-            title: "Draft loaded",
-            description: "Your draft has been loaded successfully.",
+            title: "Thread remixed",
+            description: "You're now working on a remix. Save or publish to create your own version.",
           });
         } catch (error) {
-          console.error("Error loading draft:", error);
+          console.error("Error loading thread for remix:", error);
           toast({
-            title: "Error loading draft",
-            description: "The draft could not be loaded. Please try again.",
+            title: "Error loading thread",
+            description: "The thread could not be loaded. Please try again.",
+            variant: "destructive"
+          });
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+      if (draftId && !forkId) {
+        try {
+          setIsLoading(true);
+          // Load thread by ID for editing
+          const threadData = await threadService.getThreadById(draftId);
+          setThread({
+            id: threadData.id,
+            title: threadData.title,
+            coverImage: threadData.cover_image || null,
+            segments: threadData.segments.map((seg: any) => ({
+              id: seg.id,
+              content: seg.content,
+              type: 'text'
+            })),
+            tags: threadData.tags || [],
+            isPublic: threadData.is_published,
+            lastSaved: new Date(threadData.updated_at)
+          });
+          toast({
+            title: "Thread loaded",
+            description: "Your thread has been loaded for editing.",
+          });
+        } catch (error) {
+          console.error("Error loading thread:", error);
+          toast({
+            title: "Error loading thread",
+            description: "The thread could not be loaded. Please try again.",
             variant: "destructive"
           });
         } finally {
@@ -164,7 +197,7 @@ const ThreadCreator = () => {
       }
     };
     loadThread();
-  }, [draftId, forkId]);
+  }, [draftId, forkId, remixFrom]);
   
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setThread(prev => ({ ...prev, title: e.target.value }));
@@ -205,7 +238,6 @@ const ThreadCreator = () => {
   const handleSave = async (publish = false) => {
     try {
       setIsSaving(true);
-      
       // Validate content
       if (!thread.title.trim()) {
         toast({
@@ -215,7 +247,6 @@ const ThreadCreator = () => {
         });
         return;
       }
-      
       if (thread.segments.some(s => !s.content.trim())) {
         toast({
           title: "Empty segments",
@@ -224,7 +255,6 @@ const ThreadCreator = () => {
         });
         return;
       }
-      
       // Format data for the API
       const threadData = {
         title: thread.title,
@@ -236,12 +266,10 @@ const ThreadCreator = () => {
         is_published: publish,
         cover_image: thread.coverImage
       };
-      
       let savedThread;
-      
       if (draftId && !forkId) {
         // Update existing thread
-        savedThread = await threadService.updateThread(draftId, threadData);
+        savedThread = await threadService.updateThread(thread.id, threadData);
       } else {
         // Create new thread
         savedThread = await threadService.createThread(
@@ -253,20 +281,17 @@ const ThreadCreator = () => {
           !thread.isPublic
         );
       }
-      
       setThread(prev => ({ 
         ...prev, 
         id: savedThread.id,
         lastSaved: new Date()
       }));
-      
       toast({
         title: publish ? "Thread published" : "Thread saved",
         description: publish 
           ? "Your thread has been published successfully." 
           : "Your thread has been saved as a draft.",
       });
-      
       if (publish) {
         // Navigate to view the published thread
         navigate(`/thread/${savedThread.id}`);

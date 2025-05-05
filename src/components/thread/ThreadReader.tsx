@@ -201,8 +201,8 @@ const ThreadReader = ({ threadId: propThreadId }: ThreadReaderProps) => {
         duration: 3000,
       });
       
-      // Navigate to edit the forked thread
-      navigate(`/create?draft=${forkedThread.id}`);
+      // Navigate to remix editor with original thread id
+      navigate(`/create?remixFrom=${thread.id}`);
       
     } catch (error) {
       console.error('Error forking thread:', error);
