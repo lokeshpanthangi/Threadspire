@@ -69,7 +69,7 @@ const ThreadReader = ({ threadId: propThreadId }: ThreadReaderProps) => {
         if (threadData.user_id) {
           try {
             const { data: profileData, error: profileError } = await supabase
-              .from('users')
+              .from('profiles')
               .select('*')
               .eq('id', threadData.user_id)
               .single();
@@ -226,7 +226,7 @@ const ThreadReader = ({ threadId: propThreadId }: ThreadReaderProps) => {
   };
 
   const handleEditThread = () => {
-    navigate(`/create?draft=${thread.id}`);
+    navigate(`/create?thread=${thread.id}`);
   };
 
   const handleDeleteThread = async () => {
@@ -262,9 +262,12 @@ const ThreadReader = ({ threadId: propThreadId }: ThreadReaderProps) => {
   };
 
   // Get author name and bio
-  const authorName = thread?.author?.name || 'Unknown Creator';
-  const authorBio = thread?.author?.bio || 'No bio available';
-  const authorAvatar = thread?.author?.avatar || '/placeholder-avatar.jpg';
+  const authorName = thread?.author?.name || authorProfile?.name || 'Unknown Creator';
+  const authorBio = authorProfile?.bio || thread?.author?.bio || 'No bio available';
+  const authorAvatar = thread?.author?.avatar || authorProfile?.avatar_url || '/placeholder-avatar.jpg';
+
+  // Sort segments by order_index before rendering
+  const sortedSegments = thread.segments ? [...thread.segments].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)) : [];
 
   return (
     <article className="relative">
@@ -417,7 +420,7 @@ const ThreadReader = ({ threadId: propThreadId }: ThreadReaderProps) => {
 
       {/* Thread Segments */}
       <div className="space-y-12">
-        {thread.segments.map((segment: any, index: number) => (
+        {sortedSegments.map((segment: any, index: number) => (
           <ThreadSegment 
             key={segment.id} 
             segment={{ id: segment.id, content: segment.content, type: 'text' }} 

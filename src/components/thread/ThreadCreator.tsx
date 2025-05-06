@@ -74,6 +74,7 @@ const ThreadCreator = () => {
   const draftId = queryParams.get('draft');
   const forkId = queryParams.get('fork');
   const remixFrom = queryParams.get('remixFrom');
+  const threadId = queryParams.get('thread');
   
   const [thread, setThread] = useState<ThreadData>({
     id: generateId(),
@@ -132,35 +133,54 @@ const ThreadCreator = () => {
       if (draftId && !forkId) {
         try {
           setIsLoading(true);
-          // Load thread by ID for editing
-          const threadData = await threadService.getThreadById(draftId);
+          // Load draft by ID for editing
+          const draftData = await draftService.getDraftById(draftId);
+          // Parse content (should be an array of segments)
+          let segments: ThreadSegment[] = [];
+          if (Array.isArray(draftData.content)) {
+            segments = draftData.content.map((seg: any) => ({
+              id: seg.id || generateId(),
+              content: seg.content || '',
+              type: seg.type || 'text',
+            }));
+          } else if (typeof draftData.content === 'string') {
+            try {
+              const parsed = JSON.parse(draftData.content);
+              segments = Array.isArray(parsed)
+                ? parsed.map((seg: any) => ({
+                    id: seg.id || generateId(),
+                    content: seg.content || '',
+                    type: seg.type || 'text',
+                  }))
+                : [{ id: generateId(), content: parsed, type: 'text' }];
+            } catch {
+              segments = [{ id: generateId(), content: draftData.content, type: 'text' }];
+            }
+          }
           setThread({
-            id: threadData.id,
-            title: threadData.title,
-            coverImage: threadData.cover_image || null,
-            segments: threadData.segments.map((seg: any) => ({
-              id: seg.id,
-              content: seg.content,
-              type: 'text'
-            })),
-            tags: threadData.tags || [],
-            isPublic: threadData.is_published,
-            lastSaved: new Date(threadData.updated_at)
+            id: draftData.id,
+            title: draftData.title,
+            coverImage: null, // Add cover image if you store it in drafts
+            segments: segments.length > 0 ? segments : [{ id: generateId(), content: '', type: 'text' }],
+            tags: [], // Add tags if you store them in drafts
+            isPublic: false,
+            lastSaved: draftData.updated_at ? new Date(draftData.updated_at) : null
           });
           toast({
-            title: "Thread loaded",
-            description: "Your thread has been loaded for editing.",
+            title: "Draft loaded",
+            description: "Your draft has been loaded for editing.",
           });
         } catch (error) {
-          console.error("Error loading thread:", error);
+          console.error("Error loading draft:", error);
           toast({
-            title: "Error loading thread",
-            description: "The thread could not be loaded. Please try again.",
+            title: "Error loading draft",
+            description: "The draft could not be loaded. Please try again.",
             variant: "destructive"
           });
         } finally {
           setIsLoading(false);
         }
+        return;
       } else if (forkId) {
         try {
           setIsLoading(true);
@@ -194,10 +214,42 @@ const ThreadCreator = () => {
         } finally {
           setIsLoading(false);
         }
+      } else if (threadId) {
+        try {
+          setIsLoading(true);
+          const threadData = await threadService.getThreadById(threadId);
+          setThread({
+            id: threadData.id,
+            title: threadData.title,
+            coverImage: threadData.cover_image || null,
+            segments: threadData.segments.map((seg: any) => ({
+              id: generateId(),
+              content: seg.content,
+              type: 'text'
+            })),
+            tags: threadData.tags || [],
+            isPublic: threadData.is_published,
+            lastSaved: threadData.updated_at ? new Date(threadData.updated_at) : null
+          });
+          toast({
+            title: "Thread loaded",
+            description: "Your thread has been loaded for editing.",
+          });
+        } catch (error) {
+          console.error("Error loading thread for editing:", error);
+          toast({
+            title: "Error loading thread",
+            description: "The thread could not be loaded. Please try again.",
+            variant: "destructive"
+          });
+        } finally {
+          setIsLoading(false);
+        }
+        return;
       }
     };
     loadThread();
-  }, [draftId, forkId, remixFrom]);
+  }, [draftId, forkId, remixFrom, threadId]);
   
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setThread(prev => ({ ...prev, title: e.target.value }));
@@ -212,11 +264,9 @@ const ThreadCreator = () => {
     }));
   };
   
-  const handleAddSegment = (index: number) => {
+  const handleAddSegment = () => {
     const newSegment = { id: generateId(), content: '', type: 'text' as const };
-    const newSegments = [...thread.segments];
-    newSegments.splice(index + 1, 0, newSegment);
-    setThread(prev => ({ ...prev, segments: newSegments }));
+    setThread(prev => ({ ...prev, segments: [...prev.segments, newSegment] }));
   };
   
   const handleRemoveSegment = (id: string) => {
@@ -268,10 +318,19 @@ const ThreadCreator = () => {
       };
       let savedThread;
       if (draftId && !forkId) {
-        // Update existing thread
-        savedThread = await threadService.updateThread(thread.id, threadData);
+        // Publishing a draft: create a new thread from the draft
+        savedThread = await threadService.createThread(
+          threadData.title,
+          threadData.segments.map(s => s.content),
+          threadData.tags,
+          threadData.cover_image || undefined,
+          true, // isPublished
+          !thread.isPublic
+        );
+        // Optionally, delete the draft after publishing
+        await draftService.deleteDraft(draftId);
       } else {
-        // Create new thread
+        // Create new thread (normal flow)
         savedThread = await threadService.createThread(
           threadData.title,
           threadData.segments.map(s => s.content),
@@ -674,7 +733,7 @@ const ThreadCreator = () => {
                 <Button
                   variant="outline"
                   className="flex items-center"
-                  onClick={() => handleAddSegment(thread.segments.length - 1)}
+                  onClick={handleAddSegment}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Segment

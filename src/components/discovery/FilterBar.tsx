@@ -11,11 +11,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const availableTags = [
-  'Productivity', 'Mindfulness', 'Work-Life Balance', 'Focus', 'Rest',
-  'Digital Wellness', 'Knowledge Management', 'Creativity', 'Health'
-];
-
 interface FilterBarProps {
   activeView: 'card' | 'list';
   setActiveView: (view: 'card' | 'list') => void;
@@ -25,6 +20,7 @@ interface FilterBarProps {
   onTagToggle: (tag: string) => void;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  availableTags: string[];
 }
 
 const FilterBar = ({
@@ -35,7 +31,8 @@ const FilterBar = ({
   selectedTags,
   onTagToggle,
   searchQuery,
-  onSearchChange
+  onSearchChange,
+  availableTags
 }: FilterBarProps) => {
   return (
     <div className="space-y-4">

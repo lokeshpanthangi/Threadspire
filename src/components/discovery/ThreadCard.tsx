@@ -169,17 +169,7 @@ const ThreadCard = ({ thread }: ThreadCardProps) => {
 };
 
 function formatThreadDate(date: Date) {
-  const now = new Date();
-  const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 3600 * 24));
-  if (diffInDays < 1) {
-    return 'Today';
-  } else if (diffInDays === 1) {
-    return 'Yesterday';
-  } else if (diffInDays < 7) {
-    return `${diffInDays} days ago`;
-  } else {
-    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
-  }
+  return new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
 }
 
 export default ThreadCard;

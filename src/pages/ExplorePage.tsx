@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Input } from '@/components/ui/input';
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ThreadCard from '@/components/discovery/ThreadCard';
 import { threadService } from '@/lib/services/thread.service';
 import { analyticsService } from '@/lib/services/analytics.service';
+import { supabase } from '@/lib/supabase';
 
 const ExplorePage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,12 +20,34 @@ const ExplorePage = () => {
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [profileMap, setProfileMap] = useState<Record<string, { name: string; avatarUrl: string }>>({});
 
   // Load threads on initial render
   useEffect(() => {
     loadThreads();
     loadTrendingThreads();
   }, []);
+
+  // Fetch profiles for all user_ids in results whenever results change
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      const userIds = Array.from(new Set(results.map(t => t.user_id)));
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, avatar_url')
+          .in('id', userIds);
+        const map: Record<string, { name: string; avatarUrl: string }> = {};
+        profiles?.forEach((p: any) => {
+          map[p.id] = { name: p.name || 'Anonymous', avatarUrl: p.avatar_url || '/placeholder-avatar.jpg' };
+        });
+        setProfileMap(map);
+      } else {
+        setProfileMap({});
+      }
+    };
+    if (results.length > 0) fetchProfiles();
+  }, [results]);
 
   const loadThreads = async (query = '') => {
     try {
@@ -144,16 +166,13 @@ const ExplorePage = () => {
       (a: number, b: number) => a + b, 
       0
     );
-    
+    const author = profileMap[thread.user_id] || { name: 'Anonymous', avatarUrl: '/placeholder-avatar.jpg' };
     return {
       id: thread.id,
       title: thread.title,
       snippet: thread.snippet || (thread.segments[0]?.content.substring(0, 120) + '...'),
       coverImage: thread.cover_image,
-      author: {
-        name: "Author",
-        avatarUrl: "/placeholder-avatar.jpg",
-      },
+      author,
       publishedAt: new Date(thread.created_at),
       readingTime: thread.segments.length,
       bookmarks: 0,

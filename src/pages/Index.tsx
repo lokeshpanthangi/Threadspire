@@ -98,12 +98,12 @@ const Index = () => {
         }
         // Client-side sorting for bookmarks and reactions
         if (activeSort === 'bookmarks') {
-          filteredThreads = [...filteredThreads].sort((a, b) => (b.bookmarks || 0) - (a.bookmarks || 0));
+          filteredThreads = [...filteredThreads].sort((a, b) => (Number(b.bookmarks) || 0) - (Number(a.bookmarks) || 0));
         } else if (activeSort === 'reactions') {
           filteredThreads = [...filteredThreads].sort((a, b) => {
-            const aReactions = Object.values(a.reaction_counts || {}).reduce((x, y) => x + y, 0);
-            const bReactions = Object.values(b.reaction_counts || {}).reduce((x, y) => x + y, 0);
-            return bReactions - aReactions;
+            const aReactions = Object.values(a.reaction_counts || {}).reduce((x, y) => Number(x) + Number(y), 0);
+            const bReactions = Object.values(b.reaction_counts || {}).reduce((x, y) => Number(x) + Number(y), 0);
+            return Number(bReactions) - Number(aReactions);
           });
         }
         setThreads(filteredThreads);
@@ -194,6 +194,7 @@ const Index = () => {
             onTagToggle={handleTagToggle}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            availableTags={availableTags}
           />
         </div>
         
